@@ -2,6 +2,7 @@ from wordpress import API
 import json
 import yaml
 import pandas as pd
+from datetime import datetime, timedelta
 
 config = "config.yml"
 # old config
@@ -103,22 +104,62 @@ def extract_order_items(order):
         for col in required_item_cols:
             if col in item:
                 item_order['product_' + col] = item[col]
-        item_order['product_requirement'] = product_weight(item['product_id'])*item['quantity']/1000.0
+        item_order['requirement'] = product_weight(item['product_id'])*item['quantity']/1000.0
         item_order['product_code'] = product_code(item['product_id'])
         order_items.append(item_order)
     return order_items
 
-def process_orders(orders):
+def order_passes_filter(order, from_date=None, to_date=None):
+    if from_date is not None:
+        from_dt = datetime.strptime(from_date, '%d.%m.%Y')
+    if to_date is not None:
+        to_dt = datetime.strptime(to_date, '%d.%m.%Y') + timedelta(days=1)
+    passes_filter = True
+    if order['status'] == 'completed':
+        passes_filter = False
+    else: 
+        non_zero_items = [ item for item in order["line_items"] if item['quantity'] > 0 ]
+        if len(non_zero_items) == 0:
+            passes_filter = False
+        else:
+            order["line_items"] = non_zero_items
+            date_created = datetime.strptime(order['date_created'], '%Y-%m-%dT%H:%M:%S')
+            order['date_created'] = date_created
+            if from_date is not None:
+                if date_created < from_dt:
+                    passes_filter = False
+            if to_date is not None:
+                if date_created > to_dt:
+                    passes_filter = False
+    return passes_filter
+    
+def process_orders(orders, from_date=None, to_date=None):
     all_order_items = []
     for order in orders:
-        if len(order["line_items"]) > 0:
+        if order_passes_filter(order, from_date=from_date, to_date=to_date):
             parsed_order = parse_order(order)
             all_order_items.extend(extract_order_items(parsed_order))
     return all_order_items
 
-def orders_to_excel:
-    orders = process_orders(woo_orders(wcapi))
+def orders_to_df(from_date=None, to_date=None):
+    orders = process_orders(woo_orders(wcapi), from_date=from_date, to_date=to_date)
     df = pd.DataFrame(orders)
-    writer = pd.ExcelWriter('orders.xlsx', engine='xlsxwriter')
+    df['billing_name'] = df['billing_first_name'] + ' ' + df['billing_last_name']
+    df['gemeinschaft'] = ''
+    return df
+
+cols_germany = ['gemeinschaft', 'billing_name', 'billing_address_1', 'billing_postcode', 'billing_city', 
+                'billing_email', 'billing_country', 'requirement', 'number', 'status', 'date_created']
+
+def extract_germany_df(df):
+    german_df = df[cols_germany]
+    return german_df
+
+def extract_switzerland_df(df):
+    german_df = df[cols_germany]
+    return german_df
+
+def orders_to_excel(df, file='orders.xlsx'):
+    writer = pd.ExcelWriter(file, engine='xlsxwriter')
     df.to_excel(writer, sheet_name='Sheet1')
     writer.save()

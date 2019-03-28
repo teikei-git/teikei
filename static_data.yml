@@ -7,25 +7,20 @@ products:
         code: EGM
     41:
         weight: 1000
-        code: FGB
+        code: EGB
     42:
-        weight: 250
+        weight: 1000
         code: EGM
     48:
         weight: 1000
-        code: FGB
+        code: FGM
     49:
         weight: 1000
-        code: EGB
+        code: FGB
     50:
         weight: 250
-        code: FGB
+        code: FGM
     51:
         weight: 250
         code: FGB
-    3231:
-        weight: 1000
-        code: EGB
-    3233:
-        weight: 250
-        code: EGB 
+
